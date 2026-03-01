@@ -561,8 +561,9 @@ export function TransactionsScreen() {
       getStatusColor={getStatusColor}
       getStatusLabel={getStatusLabel}
       formatDate={formatDate}
+      currency={currency}
     />
-  ), [handleTransactionPress, colors, styles, getStatusColor, getStatusLabel, formatDate]);
+  ), [handleTransactionPress, colors, styles, getStatusColor, getStatusLabel, formatDate, currency]);
 
   const renderFooter = () => {
     if (!isFetchingNextPage) return null;

@@ -24,7 +24,7 @@ import { config } from '../lib/config';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
-import { formatCents } from '../utils/currency';
+import { formatCents, fromSmallestUnit } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
@@ -282,7 +282,7 @@ export function PaymentResultScreen() {
 
       // Create a new payment intent for card payment (direct charge on connected account)
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
-        amount: amount / 100, // API expects dollars
+        amount: fromSmallestUnit(amount, currency), // API expects base currency unit
         description: preorderId ? 'Preorder Payment' : `Order ${orderNumber || 'Payment'}`,
         metadata: {
           orderId: orderId || '',

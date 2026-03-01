@@ -444,7 +444,7 @@ Root Navigator (native-stack)
 {
   items: CartItem[];                        // product, quantity, notes, cartKey
   itemCount: number;
-  subtotal: number;                         // In cents
+  subtotal: number;                         // In smallest currency unit
   orderNotes: string;                       // Order-level notes
   customerEmail: string;
   paymentMethod: 'tap_to_pay' | 'cash' | 'split';
@@ -513,7 +513,7 @@ interface Product {
   catalogId: string;
   name: string;
   description?: string | null;
-  price: number;                  // In cents
+  price: number;                  // In smallest currency unit (cents for USD, yen for JPY)
   imageUrl?: string | null;
   categoryId?: string | null;
   categoryName?: string | null;
@@ -563,7 +563,7 @@ interface Order {
 interface OrderPayment {
   id: string;
   paymentMethod: 'card' | 'cash' | 'tap_to_pay';
-  amount: number;                 // In cents
+  amount: number;                 // In smallest currency unit
   tipAmount: number;
   status: string;
   cashTendered?: number | null;
@@ -577,7 +577,7 @@ interface OrderPayment {
 ```typescript
 interface Transaction {
   id: string;
-  amount: number;                 // In cents
+  amount: number;                 // In smallest currency unit
   amountRefunded: number;
   status: 'succeeded' | 'pending' | 'failed' | 'refunded' | 'partially_refunded';
   customerEmail: string | null;
@@ -589,6 +589,61 @@ interface Transaction {
   receiptUrl: string | null;
 }
 ```
+
+---
+
+## Multi-Currency Support (MANDATORY)
+
+Luma supports multiple currencies per organization. The user's currency is available via `useAuth()`. Zero-decimal currencies (JPY, KRW, VND, etc.) have no fractional units — amounts are whole numbers with no cents.
+
+### Currency Utility Functions (`src/utils/currency.ts`)
+
+| Function | Purpose | Example |
+|----------|---------|---------|
+| `isZeroDecimal(currency)` | Check if currency has no subunits | `isZeroDecimal('jpy') → true` |
+| `fromSmallestUnit(amount, currency)` | Stripe unit → base unit | USD: `1099 → 10.99`, JPY: `1099 → 1099` |
+| `toSmallestUnit(amount, currency)` | Base unit → Stripe unit | USD: `10.99 → 1099`, JPY: `1099 → 1099` |
+| `formatCurrency(amount, currency)` | Format base-unit amount | `formatCurrency(10.99, 'usd') → "$10.99"` |
+| `formatCents(cents, currency)` | Format smallest-unit amount | `formatCents(1099, 'usd') → "$10.99"` |
+| `getCurrencySymbol(currency)` | Get symbol string | `getCurrencySymbol('eur') → "€"` |
+
+### Getting the Currency
+
+```typescript
+const { currency } = useAuth(); // From AuthContext — e.g. 'usd', 'jpy', 'eur'
+```
+
+### Rules
+
+1. **NEVER** use raw `/ 100` or `* 100` for currency conversions — always use `fromSmallestUnit()` / `toSmallestUnit()`
+2. **NEVER** hardcode `"$"` — always use `getCurrencySymbol(currency)`
+3. **NEVER** use `.toFixed(2)` on monetary amounts without checking `isZeroDecimal(currency)` first — zero-decimal currencies should use `.toFixed(0)`
+4. **NEVER** block the decimal `.` key unconditionally in numeric keypads — for zero-decimal currencies, the decimal key should be disabled
+5. **ALWAYS** pass `currency` to all `formatCurrency()` and `formatCents()` calls — never rely on the `'usd'` default
+
+### Pattern — Screen with Currency
+
+```typescript
+import { useAuth } from '../context/AuthContext';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit } from '../utils/currency';
+
+const MyScreen = () => {
+  const { currency } = useAuth();
+
+  // Display a smallest-unit amount (from cart/API):
+  const display = formatCents(totalAmountCents, currency);
+
+  // Display a currency symbol:
+  const symbol = getCurrencySymbol(currency);
+
+  // Convert for API calls:
+  const baseAmount = fromSmallestUnit(cents, currency);
+};
+```
+
+### Note on Hermes Runtime
+
+React Native's Hermes engine has limited `Intl.formatToParts` support. The App uses a `CURRENCY_SYMBOLS` lookup table in `currency.ts` for reliable symbol resolution, unlike the API/Vendor which use `Intl.NumberFormat` directly.
 
 ---
 

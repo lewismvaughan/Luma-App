@@ -36,7 +36,7 @@ import { SetupRequiredBanner } from '../components/SetupRequiredBanner';
 import { StarBackground } from '../components/StarBackground';
 import logger from '../lib/logger';
 import { isValidEmailOrEmpty } from '../lib/validation';
-import { formatCents } from '../utils/currency';
+import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit } from '../utils/currency';
 
 
 // Apple TTPOi 5.4: Use region-correct copy
@@ -286,8 +286,8 @@ export function CheckoutScreen() {
     const selectedOption = tipOptions[selectedTipIndex];
     if (selectedOption?.isCustom) {
       const customTip = parseInt(customTipAmount, 10) || 0;
-      // Custom tip is entered in dollars, convert to cents
-      const tipCents = customTip * 100;
+      // Custom tip is entered in base unit, convert to smallest unit
+      const tipCents = toSmallestUnit(customTip, currency);
       // Calculate percentage for custom tip
       const calcTipPct = subtotal > 0 ? Math.round((tipCents / subtotal) * 100) : 0;
       return { tipAmount: tipCents, grandTotal: subtotalWithTax + tipCents, tipPercentage: calcTipPct };
@@ -296,7 +296,7 @@ export function CheckoutScreen() {
     // Tip is calculated on subtotal (before tax)
     const tip = Math.round(subtotal * tipPct);
     return { tipAmount: tip, grandTotal: subtotalWithTax + tip, tipPercentage: Math.round(tipPct * 100) };
-  }, [subtotal, taxAmount, selectedTipIndex, showTipScreen, tipOptions, customTipAmount, resumedOrder]);
+  }, [subtotal, taxAmount, selectedTipIndex, showTipScreen, tipOptions, customTipAmount, resumedOrder, currency]);
 
   // Keep refs in sync for the beforeRemove handler
   useEffect(() => {
@@ -593,7 +593,7 @@ export function CheckoutScreen() {
 
       // 2. Create payment intent with tip included
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
-        amount: grandTotal / 100, // Convert cents to dollars for API
+        amount: fromSmallestUnit(grandTotal, currency), // Convert smallest unit to base unit for API
         description,
         metadata: {
           orderId: order.id,
@@ -759,7 +759,7 @@ export function CheckoutScreen() {
               <View style={styles.customTipContainer}>
                 <Text style={styles.customTipLabel} maxFontSizeMultiplier={1.5}>Custom amount:</Text>
                 <View style={styles.customTipInputRow}>
-                  <Text style={styles.customTipDollar} maxFontSizeMultiplier={1.2}>$</Text>
+                  <Text style={styles.customTipDollar} maxFontSizeMultiplier={1.2}>{getCurrencySymbol(currency)}</Text>
                   <TextInput
                     style={styles.customTipInput}
                     placeholder="0"

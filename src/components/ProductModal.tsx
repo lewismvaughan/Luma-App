@@ -22,7 +22,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { getCurrencySymbol } from '../utils/currency';
+import { getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
 import { glass } from '../lib/colors';
 import type { Product, Category } from '../lib/api';
 import { Toggle } from './Toggle';
@@ -82,7 +82,7 @@ export function ProductModal({
       if (product) {
         setName(product.name);
         setDescription(product.description || '');
-        setPriceString((product.price / 100).toFixed(2));
+        setPriceString(isZeroDecimal(currency) ? String(product.price) : (product.price / 100).toFixed(2));
         setCategoryId(product.categoryId);
         setIsActive(product.isActive);
         setExistingImageUrl(product.imageUrl);
@@ -173,7 +173,7 @@ export function ProductModal({
       await onSave({
         name: name.trim(),
         description: description.trim(),
-        price: Math.round(priceNumber * 100), // Convert to cents
+        price: toSmallestUnit(priceNumber, currency), // Convert to smallest unit
         categoryId,
         isActive,
         image: imageData,
@@ -310,7 +310,7 @@ export function ProductModal({
                   style={styles.priceInput}
                   value={priceString}
                   onChangeText={setPriceString}
-                  placeholder="0.00"
+                  placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
                   placeholderTextColor={colors.textMuted}
                   keyboardType="decimal-pad"
                   accessibilityLabel={`Product price in ${currency.toUpperCase()}`}

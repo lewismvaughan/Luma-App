@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { formatCents, getCurrencySymbol } from '../utils/currency';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { glass } from '../lib/colors';
 import { shadows, glow } from '../lib/shadows';
@@ -204,7 +204,7 @@ export function ChargeScreen() {
   const formatAmount = (value: string) => {
     const digits = value.replace(/\D/g, '');
     const rawCents = parseInt(digits || '0', 10);
-    return (rawCents / 100).toFixed(2);
+    return isZeroDecimal(currency) ? String(rawCents) : (rawCents / 100).toFixed(2);
   };
 
   const displayAmount = formatAmount(amount);

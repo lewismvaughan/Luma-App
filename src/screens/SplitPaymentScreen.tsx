@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { ordersApi, OrderPayment, stripeTerminalApi } from '../lib/api';
-import { formatCents, getCurrencySymbol } from '../utils/currency';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
 import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -121,7 +121,7 @@ export function SplitPaymentScreen() {
 
       // Create payment intent via API
       const piResponse = await stripeTerminalApi.createPaymentIntent({
-        amount: amount / 100, // Convert cents to dollars for API
+        amount: fromSmallestUnit(amount, currency), // Convert smallest unit to base unit for API
       });
 
       if (isServerDriven) {
@@ -188,7 +188,7 @@ export function SplitPaymentScreen() {
     setIsProcessing(true);
     try {
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
-        amount: amount / 100,
+        amount: fromSmallestUnit(amount, currency),
         orderId,
         isQuickCharge: false,
         captureMethod: 'automatic',
@@ -270,7 +270,7 @@ export function SplitPaymentScreen() {
 
   const MIN_STRIPE_AMOUNT_CENTS = 50; // $0.50 minimum for Stripe
 
-  const amountCents = Math.round(parseFloat(paymentAmount || '0') * 100);
+  const amountCents = toSmallestUnit(parseFloat(paymentAmount || '0'), currency);
   const isStripeMethod = selectedMethod === 'tap_to_pay' || selectedMethod === 'card';
   const isBelowStripeMinimum = isStripeMethod && amountCents > 0 && amountCents < MIN_STRIPE_AMOUNT_CENTS;
 
@@ -293,7 +293,7 @@ export function SplitPaymentScreen() {
     }
 
     if (selectedMethod === 'cash') {
-      const tenderedCents = Math.round(parseFloat(cashTendered || '0') * 100);
+      const tenderedCents = toSmallestUnit(parseFloat(cashTendered || '0'), currency);
       if (tenderedCents < amountCents) {
         Alert.alert('Insufficient Cash', 'Cash tendered must be at least the payment amount');
         return;
@@ -307,7 +307,7 @@ export function SplitPaymentScreen() {
   };
 
   const handlePayRemaining = () => {
-    setPaymentAmount((remainingBalance / 100).toFixed(2));
+    setPaymentAmount(isZeroDecimal(currency) ? String(remainingBalance) : (remainingBalance / 100).toFixed(2));
   };
 
   const getPaymentMethodIcon = (method: PaymentMethod): ComponentProps<typeof Ionicons>['name'] => {
@@ -492,7 +492,7 @@ export function SplitPaymentScreen() {
                         value={paymentAmount}
                         onChangeText={setPaymentAmount}
                         keyboardType="decimal-pad"
-                        placeholder="0.00"
+                        placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
                         placeholderTextColor={colors.textMuted}
                         accessibilityLabel="Payment amount"
                       />
@@ -518,7 +518,7 @@ export function SplitPaymentScreen() {
                           value={cashTendered}
                           onChangeText={setCashTendered}
                           keyboardType="decimal-pad"
-                          placeholder="0.00"
+                          placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
                           placeholderTextColor={colors.textMuted}
                           accessibilityLabel="Cash tendered amount"
                         />
@@ -528,7 +528,7 @@ export function SplitPaymentScreen() {
                         <View style={styles.changeDisplay}>
                           <Text style={styles.changeLabel} maxFontSizeMultiplier={1.5}>Change Due:</Text>
                           <Text style={styles.changeAmount} maxFontSizeMultiplier={1.3}>
-                            {formatCents(Math.round(Math.max(0, (parseFloat(cashTendered) - parseFloat(paymentAmount))) * 100), currency)}
+                            {formatCents(toSmallestUnit(Math.max(0, parseFloat(cashTendered) - parseFloat(paymentAmount)), currency), currency)}
                           </Text>
                         </View>
                       )}

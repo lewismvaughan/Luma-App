@@ -396,7 +396,7 @@ export function SettingsScreen() {
                     </Text>
                     {subscriptionInfo?.current_plan?.price ? (
                       <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
-                        {formatCents(subscriptionInfo.current_plan.price, currency)}/month
+                        {formatCents(subscriptionInfo.current_plan.price, subscriptionInfo.current_plan.currency || currency)}/month
                       </Text>
                     ) : null}
                   </View>

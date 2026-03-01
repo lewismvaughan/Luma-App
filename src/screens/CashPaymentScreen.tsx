@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../lib/api';
-import { formatCents, getCurrencySymbol } from '../utils/currency';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
 import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -41,7 +41,7 @@ export function CashPaymentScreen() {
   const [cashTendered, setCashTendered] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const cashTenderedCents = Math.round(parseFloat(cashTendered || '0') * 100);
+  const cashTenderedCents = toSmallestUnit(parseFloat(cashTendered || '0'), currency);
   const changeAmount = Math.max(0, cashTenderedCents - totalAmount);
   const isEnoughCash = cashTenderedCents >= totalAmount;
 
@@ -53,13 +53,16 @@ export function CashPaymentScreen() {
     if (key === 'backspace') {
       setCashTendered(prev => prev.slice(0, -1));
     } else if (key === '.') {
+      if (isZeroDecimal(currency)) return; // No decimals for zero-decimal currencies
       if (!cashTendered.includes('.')) {
         setCashTendered(prev => prev + '.');
       }
     } else {
-      // Limit decimal places to 2
-      const parts = cashTendered.split('.');
-      if (parts[1] && parts[1].length >= 2) return;
+      // Limit decimal places to 2 (skip for zero-decimal currencies)
+      if (!isZeroDecimal(currency)) {
+        const parts = cashTendered.split('.');
+        if (parts[1] && parts[1].length >= 2) return;
+      }
       setCashTendered(prev => prev + key);
     }
   };
@@ -67,7 +70,7 @@ export function CashPaymentScreen() {
   // Handle exact amount
   const handleExactAmount = () => {
     Vibration.vibrate(10);
-    setCashTendered((totalAmount / 100).toFixed(2));
+    setCashTendered(isZeroDecimal(currency) ? String(totalAmount) : (totalAmount / 100).toFixed(2));
   };
 
   // Complete cash payment
@@ -137,8 +140,8 @@ export function CashPaymentScreen() {
         <Text style={styles.tenderedLabel} maxFontSizeMultiplier={1.5}>Cash Tendered</Text>
         <View style={styles.tenderedDisplay}>
           <Text style={styles.dollarSign} maxFontSizeMultiplier={1.2}>{getCurrencySymbol(currency)}</Text>
-          <Text style={[styles.tenderedAmount, !cashTendered && styles.tenderedPlaceholder]} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={`Cash tendered ${getCurrencySymbol(currency)}${cashTendered || '0.00'}`}>
-            {cashTendered || '0.00'}
+          <Text style={[styles.tenderedAmount, !cashTendered && styles.tenderedPlaceholder]} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={`Cash tendered ${getCurrencySymbol(currency)}${cashTendered || (isZeroDecimal(currency) ? '0' : '0.00')}`}>
+            {cashTendered || (isZeroDecimal(currency) ? '0' : '0.00')}
           </Text>
         </View>
       </View>

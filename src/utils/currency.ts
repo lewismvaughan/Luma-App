@@ -10,8 +10,16 @@ const ZERO_DECIMAL_CURRENCIES = [
   'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf',
 ];
 
-function isZeroDecimal(currency: string): boolean {
+export function isZeroDecimal(currency: string): boolean {
   return ZERO_DECIMAL_CURRENCIES.includes(currency.toLowerCase());
+}
+
+export function fromSmallestUnit(amount: number, currency: string): number {
+  return isZeroDecimal(currency) ? amount : amount / 100;
+}
+
+export function toSmallestUnit(amount: number, currency: string): number {
+  return isZeroDecimal(currency) ? Math.round(amount) : Math.round(amount * 100);
 }
 
 /**

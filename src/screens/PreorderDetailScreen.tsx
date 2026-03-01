@@ -18,7 +18,7 @@ import { useSocketEvent, useSocket, SocketEvents } from '../context/SocketContex
 import { preordersApi, Preorder, PreorderStatus } from '../lib/api/preorders';
 import { stripeTerminalApi } from '../lib/api/stripe-terminal';
 import { usePreorders } from '../context/PreordersContext';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, toSmallestUnit } from '../utils/currency';
 import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -192,7 +192,7 @@ export function PreorderDetailScreen() {
                   paymentIntentId: paymentIntent.id,
                   clientSecret: paymentIntent.clientSecret,
                   stripeAccountId: paymentIntent.stripeAccountId,
-                  amount: Math.round(preorder.totalAmount * 100),
+                  amount: toSmallestUnit(preorder.totalAmount, currency),
                   customerEmail: preorder.customerEmail,
                   preorderId: preorder.id,
                 });

@@ -269,16 +269,12 @@ export function StripeOnboardingScreen() {
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasShownCompletion, setHasShownCompletion] = useState(false);
-  const [mountWebView, setMountWebView] = useState(false);
 
   const styles = createStyles(colors);
 
   // Fetch the onboarding URL when the screen mounts
-  // Delay WebView mount so the loading UI renders instantly without the WebKit engine blocking the main thread
   useEffect(() => {
     fetchOnboardingUrl();
-    const timer = setTimeout(() => setMountWebView(true), 100);
-    return () => clearTimeout(timer);
   }, []);
 
   const fetchOnboardingUrl = async () => {
@@ -367,26 +363,26 @@ export function StripeOnboardingScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      {/* WebView mount is deferred so the loading UI renders instantly */}
+      {/* WebView only mounts once the URL is ready — avoids booting WebKit on an empty page */}
       <View style={styles.webView}>
-        {mountWebView && (
-        <WebView
-          ref={webViewRef}
-          source={onboardingUrl ? { uri: onboardingUrl } : { html: '' }}
-          style={styles.webView}
-          onShouldStartLoadWithRequest={handleShouldStartLoad}
-          onLoadEnd={(event) => {
-            logger.log('[StripeOnboarding] onLoadEnd, url:', event.nativeEvent.url, 'onboardingUrl:', onboardingUrl);
-            if (onboardingUrl) setIsWebViewLoading(false);
-          }}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          sharedCookiesEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          contentMode="mobile"
-          automaticallyAdjustContentInsets={false}
-          scalesPageToFit={true}
-        />
+        {onboardingUrl && (
+          <WebView
+            ref={webViewRef}
+            source={{ uri: onboardingUrl }}
+            style={styles.webView}
+            onShouldStartLoadWithRequest={handleShouldStartLoad}
+            onLoadEnd={(event) => {
+              logger.log('[StripeOnboarding] onLoadEnd, url:', event.nativeEvent.url);
+              setIsWebViewLoading(false);
+            }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            sharedCookiesEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            contentMode="mobile"
+            automaticallyAdjustContentInsets={false}
+            scalesPageToFit={true}
+          />
         )}
 
         {/* Loading overlay on top of WebView */}

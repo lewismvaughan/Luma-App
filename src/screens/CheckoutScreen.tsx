@@ -67,7 +67,7 @@ export function CheckoutScreen() {
   const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
   const { selectedCatalog } = useCatalog();
   const { isPaymentReady, connectLoading, connectStatus, currency } = useAuth();
-  const { deviceCompatibility, isInitialized: isTerminalInitialized, isWarming } = useTerminal();
+  const { deviceCompatibility, isInitialized: isTerminalInitialized, isWarming, preferredReader } = useTerminal();
 
   // Catalog data is automatically updated via socket events in CatalogContext
 
@@ -607,8 +607,12 @@ export function CheckoutScreen() {
         receiptEmail,
       });
 
-      // 3. Link PaymentIntent to order
-      await ordersApi.linkPaymentIntent(order.id, paymentIntent.id);
+      // 3. Link PaymentIntent to order (with reader tracking info)
+      await ordersApi.linkPaymentIntent(order.id, paymentIntent.id, undefined, {
+        readerId: preferredReader?.id,
+        readerLabel: preferredReader?.label || undefined,
+        readerType: preferredReader?.readerType || 'tap_to_pay',
+      });
 
       // Navigate to payment processing screen
       navigation.navigate('PaymentProcessing', {

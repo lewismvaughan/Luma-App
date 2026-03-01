@@ -134,6 +134,9 @@ export function SplitPaymentScreen() {
           paymentMethod: 'tap_to_pay',
           amount,
           stripePaymentIntentId: piResponse.id,
+          readerId: preferredReader.id,
+          readerLabel: preferredReader.label || undefined,
+          readerType: 'internet',
         });
       } else {
         // SDK-driven flow (Tap to Pay or Bluetooth reader)
@@ -159,6 +162,9 @@ export function SplitPaymentScreen() {
           paymentMethod: 'tap_to_pay',
           amount,
           stripePaymentIntentId: piResponse.id,
+          readerId: preferredReader?.id,
+          readerLabel: preferredReader?.label || undefined,
+          readerType: preferredReader?.readerType || 'tap_to_pay',
         });
       }
 

@@ -269,13 +269,16 @@ export function StripeOnboardingScreen() {
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasShownCompletion, setHasShownCompletion] = useState(false);
+  const [mountWebView, setMountWebView] = useState(false);
 
   const styles = createStyles(colors);
 
   // Fetch the onboarding URL when the screen mounts
-  // WebView mounts immediately to warm its engine in parallel
+  // Delay WebView mount so the loading UI renders instantly without the WebKit engine blocking the main thread
   useEffect(() => {
     fetchOnboardingUrl();
+    const timer = setTimeout(() => setMountWebView(true), 100);
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchOnboardingUrl = async () => {
@@ -364,8 +367,9 @@ export function StripeOnboardingScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      {/* WebView mounts immediately to warm the engine while the API call runs */}
+      {/* WebView mount is deferred so the loading UI renders instantly */}
       <View style={styles.webView}>
+        {mountWebView && (
         <WebView
           ref={webViewRef}
           source={onboardingUrl ? { uri: onboardingUrl } : { html: '' }}
@@ -383,6 +387,7 @@ export function StripeOnboardingScreen() {
           automaticallyAdjustContentInsets={false}
           scalesPageToFit={true}
         />
+        )}
 
         {/* Loading overlay on top of WebView */}
         {showLoading && !error && (

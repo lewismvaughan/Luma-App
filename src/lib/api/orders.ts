@@ -99,6 +99,9 @@ export interface AddPaymentParams {
   tipAmount?: number;
   stripePaymentIntentId?: string;
   cashTendered?: number; // for cash payments
+  readerId?: string;
+  readerLabel?: string;
+  readerType?: 'bluetooth' | 'internet' | 'tap_to_pay';
 }
 
 export interface AddPaymentResponse {
@@ -127,10 +130,16 @@ export const ordersApi = {
    * Link a Stripe PaymentIntent to an existing order
    * Optionally update the payment method (e.g., when falling back to manual card entry)
    */
-  linkPaymentIntent: (orderId: string, stripePaymentIntentId: string, paymentMethod?: 'card' | 'cash' | 'tap_to_pay') =>
+  linkPaymentIntent: (
+    orderId: string,
+    stripePaymentIntentId: string,
+    paymentMethod?: 'card' | 'cash' | 'tap_to_pay',
+    readerInfo?: { readerId?: string; readerLabel?: string; readerType?: 'bluetooth' | 'internet' | 'tap_to_pay' },
+  ) =>
     apiClient.patch<Order>(`/orders/${orderId}/payment-intent`, {
       stripePaymentIntentId,
       ...(paymentMethod && { paymentMethod }),
+      ...readerInfo,
     }),
 
   /**

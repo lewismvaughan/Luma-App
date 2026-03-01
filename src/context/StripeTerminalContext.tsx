@@ -23,13 +23,6 @@ try {
   Device = null;
 }
 
-// Conditionally import expo-location for iOS Bluetooth permission requirements
-let Location: typeof import('expo-location') | null = null;
-try {
-  Location = require('expo-location');
-} catch {
-  Location = null;
-}
 import { stripeTerminalApi } from '../lib/api';
 import { useAuth } from './AuthContext';
 import { useDevice } from './DeviceContext';
@@ -309,6 +302,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     collectPaymentMethod,
     confirmPaymentIntent,
     cancelCollectPaymentMethod,
+    cancelDiscovering,
     connectedReader: sdkConnectedReader,
   } = useStripeTerminal({
     onUpdateDiscoveredReaders: (readers: any[]) => {
@@ -577,20 +571,38 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
       // Clear previous discovered readers
       discoveredReadersRef.current = [];
 
-      // Start discovery
-      const discoverResult = await discoverReaders({
-        discoveryMethod,
-        simulated: useSimulator,
-      });
+      // Start discovery — for bluetoothScan, don't await since it runs
+      // continuously and only resolves when cancelled.
+      let discoveryErrorMsg: string | null = null;
+      if (discoveryMethod === 'bluetoothScan') {
+        const discoverPromise = discoverReaders({
+          discoveryMethod,
+          simulated: useSimulator,
+        });
+        discoverPromise.then((result) => {
+          if (result.error) {
+            logger.error('[StripeTerminal] Discovery error:', result.error);
+            discoveryErrorMsg = result.error.message || result.error.code || 'Unknown error';
+          }
+        }).catch((err) => {
+          logger.error('[StripeTerminal] Discovery promise rejected:', err);
+          discoveryErrorMsg = err.message || 'Discovery failed';
+        });
+      } else {
+        const discoverResult = await discoverReaders({
+          discoveryMethod,
+          simulated: useSimulator,
+        });
 
-      logger.log('[StripeTerminal] Discovery result:', JSON.stringify(discoverResult, null, 2));
+        logger.log('[StripeTerminal] Discovery result:', JSON.stringify(discoverResult, null, 2));
 
-      if (discoverResult.error) {
-        logger.error('[StripeTerminal] Discovery error:', discoverResult.error);
-        const errMsg = `Discovery: ${discoverResult.error.message || discoverResult.error.code || 'Unknown error'}`;
-        setError(errMsg);
-        setIsConnected(false);
-        throw new Error(errMsg);
+        if (discoverResult.error) {
+          logger.error('[StripeTerminal] Discovery error:', discoverResult.error);
+          const errMsg = `Discovery: ${discoverResult.error.message || discoverResult.error.code || 'Unknown error'}`;
+          setError(errMsg);
+          setIsConnected(false);
+          throw new Error(errMsg);
+        }
       }
 
       // Wait for readers to be discovered via callback
@@ -599,6 +611,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
         logger.log('[StripeTerminal] No readers in ref yet, polling...');
         const maxPolls = discoveryMethod === 'bluetoothScan' ? 25 : 15; // Bluetooth takes longer
         for (let i = 0; i < maxPolls; i++) {
+          if (discoveryErrorMsg) break;
           await new Promise(resolve => setTimeout(resolve, 200));
           readers = discoveredReadersRef.current.length > 0
             ? discoveredReadersRef.current
@@ -608,6 +621,22 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
             break;
           }
         }
+      }
+
+      // Cancel Bluetooth discovery after polling completes
+      if (discoveryMethod === 'bluetoothScan') {
+        try {
+          await cancelDiscovering();
+        } catch {
+          // Ignore — discovery may have already stopped
+        }
+      }
+
+      if (discoveryErrorMsg) {
+        const errMsg = `Discovery: ${discoveryErrorMsg}`;
+        setError(errMsg);
+        setIsConnected(false);
+        throw new Error(errMsg);
       }
 
       if (readers.length === 0) {
@@ -706,7 +735,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     });
     connectingPromiseRef.current = promise;
     return promise;
-  }, [discoverReaders, sdkConnectReader, locationId, hookDiscoveredReaders, isConnected]);
+  }, [discoverReaders, cancelDiscovering, sdkConnectReader, locationId, hookDiscoveredReaders, isConnected]);
 
   // Track if we've already attempted auto-connect on Android
   const hasAutoConnectedRef = useRef(false);
@@ -899,17 +928,6 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     discoveredReadersRef.current = [];
 
     try {
-      // iOS: Request location permission (required for Bluetooth scanning)
-      if (Platform.OS === 'ios' && Location) {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        logger.log('[StripeTerminal] iOS location permission status:', status);
-        if (status !== 'granted') {
-          throw new Error(
-            'Location permission is required to scan for Bluetooth readers. Please enable it in Settings > Privacy > Location Services.'
-          );
-        }
-      }
-
       // Ensure SDK is initialized
       if (!isInitialized) {
         logger.log('[StripeTerminal] SDK not initialized, initializing for BT scan...');
@@ -920,23 +938,41 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
         setIsInitialized(true);
       }
 
-      const discoverResult = await discoverReaders({
+      // Start discovery WITHOUT awaiting — bluetoothScan runs continuously
+      // and only resolves when cancelled, so awaiting would block forever.
+      const discoverPromise = discoverReaders({
         discoveryMethod: 'bluetoothScan',
         simulated: false,
       });
 
-      if (discoverResult.error) {
-        throw new Error(discoverResult.error.message || 'Discovery failed');
-      }
+      // Check for immediate errors (e.g. SDK not ready)
+      let discoveryErrored = false;
+      discoverPromise.then((result) => {
+        if (result.error) {
+          logger.error('[StripeTerminal] Discovery error:', result.error);
+          discoveryErrored = true;
+        }
+      }).catch((err) => {
+        logger.error('[StripeTerminal] Discovery promise rejected:', err);
+        discoveryErrored = true;
+      });
 
-      // Wait for readers to appear via callback (Bluetooth discovery can take 10-15s)
+      // Poll for readers via onUpdateDiscoveredReaders callback (max ~15s)
       let readers: any[] = [];
       for (let i = 0; i < 75; i++) {
+        if (discoveryErrored) break;
         await new Promise(resolve => setTimeout(resolve, 200));
         readers = discoveredReadersRef.current.length > 0
           ? discoveredReadersRef.current
           : (hookDiscoveredReaders || []);
         if (readers.length > 0) break;
+      }
+
+      // Cancel the ongoing Bluetooth discovery
+      try {
+        await cancelDiscovering();
+      } catch {
+        // Ignore — discovery may have already stopped
       }
 
       logger.log('[StripeTerminal] Bluetooth scan found:', readers.length, 'readers');
@@ -953,7 +989,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     } finally {
       setIsScanning(false);
     }
-  }, [discoverReaders, hookDiscoveredReaders, isInitialized, initialize]);
+  }, [discoverReaders, cancelDiscovering, hookDiscoveredReaders, isInitialized, initialize]);
 
   const processPayment = useCallback(async (clientSecret: string) => {
     logger.log('[StripeTerminal] ========== PROCESS PAYMENT START ==========');

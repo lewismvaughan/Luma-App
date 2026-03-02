@@ -6,6 +6,11 @@ import { isBiometricLoginEnabled, clearStoredCredentials } from '../biometricAut
 import { getDeviceId, getDeviceInfoForApi } from '../device';
 import logger from '../logger';
 
+export interface ComputedRates {
+  tapToPay: { starter: string; pro: string };
+  manualCard: { starter: string; pro: string };
+}
+
 export interface User {
   id: string;
   email: string;
@@ -22,6 +27,7 @@ export interface User {
   onboardingCompleted?: boolean;
   tapToPayDeviceIds?: string[];
   currency?: string;
+  rates?: ComputedRates;
 }
 
 export interface Organization {

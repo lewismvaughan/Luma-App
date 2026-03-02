@@ -42,7 +42,7 @@ export function UpgradeScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const glassColors = isDark ? glass.dark : glass.light;
-  const { refreshAuth } = useAuth();
+  const { refreshAuth, user } = useAuth();
 
   const [product, setProduct] = useState<SubscriptionProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -197,7 +197,7 @@ export function UpgradeScreen() {
           <Ionicons name="card-outline" size={20} color={colors.success} />
           <View style={styles.feeTextContainer}>
             <Text style={styles.feeTitle} maxFontSizeMultiplier={1.5}>Lower Transaction Fees</Text>
-            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>2.8% + $0.16 per tap (vs 2.9% + $0.18)</Text>
+            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{user?.rates?.tapToPay.pro || '2.8% + $0.16'} per tap (vs {user?.rates?.tapToPay.starter || '2.9% + $0.18'})</Text>
           </View>
         </View>
 

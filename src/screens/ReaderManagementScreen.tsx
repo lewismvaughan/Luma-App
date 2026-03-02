@@ -9,6 +9,10 @@ import {
   Alert,
   TextInput,
   RefreshControl,
+  Modal,
+  Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -45,6 +49,9 @@ export function ReaderManagementScreen() {
   const [showRegister, setShowRegister] = useState(false);
   const [registrationCode, setRegistrationCode] = useState('');
   const [readerLabel, setReaderLabel] = useState('');
+  const [connectingSerial, setConnectingSerial] = useState<string | null>(null);
+  const [namingReader, setNamingReader] = useState<{ serial: string; deviceType: string; defaultName: string } | null>(null);
+  const [readerNameInput, setReaderNameInput] = useState('');
 
   // Fetch registered readers
   const { data: readersData, isLoading, refetch } = useQuery({
@@ -148,31 +155,33 @@ export function ReaderManagementScreen() {
   }, [scanForBluetoothReaders]);
 
   const handleConnectBluetooth = useCallback(async (reader: any) => {
+    const serial = reader.serialNumber || reader.id;
+    setConnectingSerial(serial);
     try {
       await connectReader('bluetoothScan', reader);
-      // Offer to set as default
-      Alert.alert(
-        'Connected',
-        `Connected to ${reader.label || reader.serialNumber || 'reader'}. Set as default reader?`,
-        [
-          {
-            text: 'Set as Default',
-            onPress: () => {
-              setPreferredReader({
-                id: reader.serialNumber || reader.id,
-                label: reader.label || reader.serialNumber || null,
-                deviceType: reader.deviceType || 'bluetooth',
-                readerType: 'bluetooth',
-              });
-            },
-          },
-          { text: 'Not Now', style: 'cancel' },
-        ]
-      );
+      // Show naming modal
+      const defaultName = reader.label || reader.serialNumber || 'Bluetooth Reader';
+      setReaderNameInput(defaultName);
+      setNamingReader({ serial, deviceType: reader.deviceType || 'bluetooth', defaultName });
     } catch (err: any) {
-      Alert.alert('Connection Failed', err.message || 'Failed to connect to reader.');
+      Alert.alert('Connection Failed', err.message || 'Could not connect to the Bluetooth reader. Make sure it is powered on and nearby.');
+    } finally {
+      setConnectingSerial(null);
     }
-  }, [connectReader, setPreferredReader]);
+  }, [connectReader]);
+
+  const handleSaveReaderName = useCallback(async (name: string) => {
+    if (!namingReader) return;
+    const label = name.trim() || namingReader.defaultName;
+    await setPreferredReader({
+      id: namingReader.serial,
+      label,
+      deviceType: namingReader.deviceType,
+      readerType: 'bluetooth',
+    });
+    setNamingReader(null);
+    setReaderNameInput('');
+  }, [namingReader, setPreferredReader]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnectReader();
@@ -606,28 +615,39 @@ export function ReaderManagementScreen() {
             {bluetoothReaders.length > 0 && (
               <>
                 <View style={styles.divider} />
-                {bluetoothReaders.map((reader, index) => (
-                  <React.Fragment key={reader.serialNumber || index}>
-                    {index > 0 && <View style={styles.divider} />}
-                    <TouchableOpacity
-                      style={styles.row}
-                      onPress={() => handleConnectBluetooth(reader)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Connect to ${reader.label || reader.serialNumber || 'reader'}`}
-                    >
-                      <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
-                      <View style={styles.rowLeft}>
-                        <Text style={styles.readerName} maxFontSizeMultiplier={1.3}>
-                          {reader.label || reader.serialNumber || 'Unknown Reader'}
-                        </Text>
-                        <Text style={styles.readerDetail} maxFontSizeMultiplier={1.5}>
-                          {reader.deviceType || 'Bluetooth'} · Tap to connect
-                        </Text>
-                      </View>
-                      <Ionicons name="link-outline" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-                  </React.Fragment>
-                ))}
+                {bluetoothReaders.map((reader, index) => {
+                  const serial = reader.serialNumber || reader.id;
+                  const isThisConnecting = connectingSerial === serial;
+                  return (
+                    <React.Fragment key={serial || index}>
+                      {index > 0 && <View style={styles.divider} />}
+                      <TouchableOpacity
+                        style={[styles.row, isThisConnecting && { opacity: 0.6 }]}
+                        onPress={() => handleConnectBluetooth(reader)}
+                        disabled={!!connectingSerial}
+                        accessibilityRole="button"
+                        accessibilityLabel={isThisConnecting ? 'Connecting to reader' : `Connect to ${reader.label || reader.serialNumber || 'reader'}`}
+                      >
+                        {isThisConnecting ? (
+                          <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+                        ) : (
+                          <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+                        )}
+                        <View style={styles.rowLeft}>
+                          <Text style={styles.readerName} maxFontSizeMultiplier={1.3}>
+                            {(preferredReader?.id === serial && preferredReader?.label) || reader.label || reader.serialNumber || 'Unknown Reader'}
+                          </Text>
+                          <Text style={styles.readerDetail} maxFontSizeMultiplier={1.5}>
+                            {isThisConnecting ? 'Connecting...' : `${reader.deviceType || 'Bluetooth'} · Tap to connect`}
+                          </Text>
+                        </View>
+                        {!isThisConnecting && (
+                          <Ionicons name="link-outline" size={20} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    </React.Fragment>
+                  );
+                })}
               </>
             )}
           </View>
@@ -635,6 +655,77 @@ export function ReaderManagementScreen() {
 
         <View style={{ height: insets.bottom + 32 }} />
       </ScrollView>
+
+      {/* Reader Naming Modal */}
+      <Modal
+        visible={!!namingReader}
+        transparent
+        animationType="slide"
+        onRequestClose={() => handleSaveReaderName(namingReader?.defaultName || '')}
+        accessibilityViewIsModal
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <Pressable
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
+            onPress={() => handleSaveReaderName(namingReader?.defaultName || '')}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+          >
+            <Pressable
+              style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24 }}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+                <Text style={{ fontSize: 20, fontFamily: fonts.bold, color: colors.text, marginLeft: 8 }} maxFontSizeMultiplier={1.3}>
+                  Reader Connected
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, fontFamily: fonts.regular, color: colors.textSecondary, marginBottom: 20 }} maxFontSizeMultiplier={1.5}>
+                Give this reader a name to identify it easily.
+              </Text>
+
+              <View style={{ borderRadius: 14, borderWidth: 1, borderColor: glassColors.border, backgroundColor: glassColors.background, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 20 }}>
+                <TextInput
+                  style={{ fontSize: 16, fontFamily: fonts.regular, color: colors.text }}
+                  value={readerNameInput}
+                  onChangeText={setReaderNameInput}
+                  placeholder="e.g. Bar Reader, Front Counter"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                  selectTextOnFocus
+                  maxLength={50}
+                  returnKeyType="done"
+                  onSubmitEditing={() => handleSaveReaderName(readerNameInput)}
+                  accessibilityLabel="Reader name"
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
+                  onPress={() => handleSaveReaderName(namingReader?.defaultName || '')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Skip naming"
+                >
+                  <Text style={{ fontSize: 16, fontFamily: fonts.semiBold, color: colors.text }} maxFontSizeMultiplier={1.3}>Skip</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center' }}
+                  onPress={() => handleSaveReaderName(readerNameInput)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save reader name"
+                >
+                  <Text style={{ fontSize: 16, fontFamily: fonts.semiBold, color: '#FFFFFF' }} maxFontSizeMultiplier={1.3}>Save</Text>
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }

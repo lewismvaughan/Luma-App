@@ -71,7 +71,7 @@ export function CategoryManagerModal({
       await onCreateCategory(name);
       setNewCategoryName('');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create menu');
+      Alert.alert('Error', error.message || 'Failed to create category');
     } finally {
       setIsCreating(false);
     }
@@ -97,7 +97,7 @@ export function CategoryManagerModal({
       setEditingCategoryId(null);
       setEditingName('');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update menu');
+      Alert.alert('Error', error.message || 'Failed to update category');
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -112,7 +112,7 @@ export function CategoryManagerModal({
     try {
       await onUpdateCategory(category.id, { isActive: !category.isActive });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update menu');
+      Alert.alert('Error', error.message || 'Failed to update category');
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -124,8 +124,8 @@ export function CategoryManagerModal({
 
   const handleDeleteCategory = async (category: Category) => {
     Alert.alert(
-      'Delete Menu',
-      `Are you sure you want to delete "${category.name}"? Products in this menu will become unassigned.`,
+      'Delete Category',
+      `Are you sure you want to delete "${category.name}"? Products in this category will become uncategorized.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -136,7 +136,7 @@ export function CategoryManagerModal({
             try {
               await onDeleteCategory(category.id);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete menu');
+              Alert.alert('Error', error.message || 'Failed to delete category');
             } finally {
               setSavingIds(prev => {
                 const next = new Set(prev);
@@ -168,7 +168,7 @@ export function CategoryManagerModal({
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title} maxFontSizeMultiplier={1.3}>Manage Menus</Text>
+            <Text style={styles.title} maxFontSizeMultiplier={1.3}>Manage Categories</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
@@ -181,12 +181,12 @@ export function CategoryManagerModal({
                 style={styles.createInput}
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
-                placeholder="New menu name"
+                placeholder="New category name"
                 placeholderTextColor={colors.textMuted}
                 maxLength={50}
                 onSubmitEditing={handleCreateCategory}
                 returnKeyType="done"
-                accessibilityLabel="New menu name"
+                accessibilityLabel="New category name"
               />
               <TouchableOpacity
                 style={[
@@ -196,7 +196,7 @@ export function CategoryManagerModal({
                 onPress={handleCreateCategory}
                 disabled={!newCategoryName.trim() || isCreating}
                 accessibilityRole="button"
-                accessibilityLabel={isCreating ? 'Creating menu' : 'Create menu'}
+                accessibilityLabel={isCreating ? 'Creating category' : 'Create category'}
               >
                 {isCreating ? (
                   <ActivityIndicator size="small" color="#fff" accessibilityLabel="Creating" />
@@ -218,7 +218,7 @@ export function CategoryManagerModal({
               <View style={styles.infoHint}>
                 <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.infoHintText} maxFontSizeMultiplier={1.5}>
-                  Products can be assigned to menus when editing them
+                  Products can be assigned to categories when editing them
                 </Text>
               </View>
             )}
@@ -226,9 +226,9 @@ export function CategoryManagerModal({
             {sortedCategories.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="folder-open-outline" size={56} color={colors.textMuted} />
-                <Text style={styles.emptyStateText} maxFontSizeMultiplier={1.3}>No menus yet</Text>
+                <Text style={styles.emptyStateText} maxFontSizeMultiplier={1.3}>No categories yet</Text>
                 <Text style={styles.emptyStateSubtext} maxFontSizeMultiplier={1.5}>
-                  Create your first menu above to organize your products
+                  Create your first category above to organize your products
                 </Text>
               </View>
             ) : (
@@ -247,14 +247,14 @@ export function CategoryManagerModal({
                           autoFocus
                           maxLength={50}
                           onSubmitEditing={() => handleSaveEdit(category.id)}
-                          accessibilityLabel="Edit menu name"
+                          accessibilityLabel="Edit category name"
                         />
                         <TouchableOpacity
                           style={styles.editActionButton}
                           onPress={() => handleSaveEdit(category.id)}
                           disabled={isSaving}
                           accessibilityRole="button"
-                          accessibilityLabel="Save menu name"
+                          accessibilityLabel="Save category name"
                         >
                           {isSaving ? (
                             <ActivityIndicator size="small" color={colors.success} accessibilityLabel="Saving" />
@@ -266,7 +266,7 @@ export function CategoryManagerModal({
                           style={styles.editActionButton}
                           onPress={handleCancelEdit}
                           accessibilityRole="button"
-                          accessibilityLabel="Cancel editing menu"
+                          accessibilityLabel="Cancel editing"
                         >
                           <Ionicons name="close" size={22} color={colors.error} />
                         </TouchableOpacity>
@@ -278,7 +278,7 @@ export function CategoryManagerModal({
                           onPress={() => handleStartEdit(category)}
                           accessibilityRole="button"
                           accessibilityLabel={`Edit ${category.name}`}
-                          accessibilityHint="Tap to rename this menu"
+                          accessibilityHint="Tap to rename this category"
                         >
                           <View style={styles.categoryNameRow}>
                             <Text style={[
@@ -306,7 +306,7 @@ export function CategoryManagerModal({
                               <Toggle
                                 value={category.isActive}
                                 onValueChange={() => handleToggleActive(category)}
-                                accessibilityLabel={`${category.name} menu visibility`}
+                                accessibilityLabel={`${category.name} visibility`}
                               />
                               <TouchableOpacity
                                 style={styles.deleteButton}

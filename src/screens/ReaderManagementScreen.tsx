@@ -9,10 +9,6 @@ import {
   Alert,
   TextInput,
   RefreshControl,
-  Modal,
-  Pressable,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -50,8 +46,6 @@ export function ReaderManagementScreen() {
   const [registrationCode, setRegistrationCode] = useState('');
   const [readerLabel, setReaderLabel] = useState('');
   const [connectingSerial, setConnectingSerial] = useState<string | null>(null);
-  const [namingReader, setNamingReader] = useState<{ serial: string; deviceType: string; defaultName: string } | null>(null);
-  const [readerNameInput, setReaderNameInput] = useState('');
 
   // Fetch registered readers
   const { data: readersData, isLoading, refetch } = useQuery({
@@ -159,29 +153,18 @@ export function ReaderManagementScreen() {
     setConnectingSerial(serial);
     try {
       await connectReader('bluetoothScan', reader);
-      // Show naming modal
-      const defaultName = reader.label || reader.serialNumber || 'Bluetooth Reader';
-      setReaderNameInput(defaultName);
-      setNamingReader({ serial, deviceType: reader.deviceType || 'bluetooth', defaultName });
+      await setPreferredReader({
+        id: serial,
+        label: reader.label || reader.serialNumber || 'Bluetooth Reader',
+        deviceType: reader.deviceType || 'bluetooth',
+        readerType: 'bluetooth',
+      });
     } catch (err: any) {
       Alert.alert('Connection Failed', err.message || 'Could not connect to the Bluetooth reader. Make sure it is powered on and nearby.');
     } finally {
       setConnectingSerial(null);
     }
-  }, [connectReader]);
-
-  const handleSaveReaderName = useCallback(async (name: string) => {
-    if (!namingReader) return;
-    const label = name.trim() || namingReader.defaultName;
-    await setPreferredReader({
-      id: namingReader.serial,
-      label,
-      deviceType: namingReader.deviceType,
-      readerType: 'bluetooth',
-    });
-    setNamingReader(null);
-    setReaderNameInput('');
-  }, [namingReader, setPreferredReader]);
+  }, [connectReader, setPreferredReader]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnectReader();
@@ -635,7 +618,7 @@ export function ReaderManagementScreen() {
                         )}
                         <View style={styles.rowLeft}>
                           <Text style={styles.readerName} maxFontSizeMultiplier={1.3}>
-                            {(preferredReader?.id === serial && preferredReader?.label) || reader.label || reader.serialNumber || 'Unknown Reader'}
+                            {reader.label || reader.serialNumber || 'Unknown Reader'}
                           </Text>
                           <Text style={styles.readerDetail} maxFontSizeMultiplier={1.5}>
                             {isThisConnecting ? 'Connecting...' : `${reader.deviceType || 'Bluetooth'} · Tap to connect`}
@@ -656,76 +639,6 @@ export function ReaderManagementScreen() {
         <View style={{ height: insets.bottom + 32 }} />
       </ScrollView>
 
-      {/* Reader Naming Modal */}
-      <Modal
-        visible={!!namingReader}
-        transparent
-        animationType="slide"
-        onRequestClose={() => handleSaveReaderName(namingReader?.defaultName || '')}
-        accessibilityViewIsModal
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
-        >
-          <Pressable
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}
-            onPress={() => handleSaveReaderName(namingReader?.defaultName || '')}
-            accessibilityLabel="Close"
-            accessibilityRole="button"
-          >
-            <Pressable
-              style={{ backgroundColor: colors.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: insets.bottom + 24 }}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-                <Text style={{ fontSize: 20, fontFamily: fonts.bold, color: colors.text, marginLeft: 8 }} maxFontSizeMultiplier={1.3}>
-                  Reader Connected
-                </Text>
-              </View>
-              <Text style={{ fontSize: 14, fontFamily: fonts.regular, color: colors.textSecondary, marginBottom: 20 }} maxFontSizeMultiplier={1.5}>
-                Give this reader a name to identify it easily.
-              </Text>
-
-              <View style={{ borderRadius: 14, borderWidth: 1, borderColor: glassColors.border, backgroundColor: glassColors.background, paddingHorizontal: 16, paddingVertical: 12, marginBottom: 20 }}>
-                <TextInput
-                  style={{ fontSize: 16, fontFamily: fonts.regular, color: colors.text }}
-                  value={readerNameInput}
-                  onChangeText={setReaderNameInput}
-                  placeholder="e.g. Bar Reader, Front Counter"
-                  placeholderTextColor={colors.textMuted}
-                  autoFocus
-                  selectTextOnFocus
-                  maxLength={50}
-                  returnKeyType="done"
-                  onSubmitEditing={() => handleSaveReaderName(readerNameInput)}
-                  accessibilityLabel="Reader name"
-                />
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: colors.border, alignItems: 'center' }}
-                  onPress={() => handleSaveReaderName(namingReader?.defaultName || '')}
-                  accessibilityRole="button"
-                  accessibilityLabel="Skip naming"
-                >
-                  <Text style={{ fontSize: 16, fontFamily: fonts.semiBold, color: colors.text }} maxFontSizeMultiplier={1.3}>Skip</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={{ flex: 1, paddingVertical: 14, borderRadius: 14, backgroundColor: colors.primary, alignItems: 'center' }}
-                  onPress={() => handleSaveReaderName(readerNameInput)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Save reader name"
-                >
-                  <Text style={{ fontSize: 16, fontFamily: fonts.semiBold, color: '#FFFFFF' }} maxFontSizeMultiplier={1.3}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
     </View>
   );
 }

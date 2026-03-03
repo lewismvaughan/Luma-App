@@ -556,6 +556,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
               contentContainerStyle={[styles.modalBodyContent, { paddingBottom: Math.max(insets.bottom, 20) + 20 }]}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
+              automaticallyAdjustKeyboardInsets
             >
               <View style={styles.inputSection}>
                 <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Menu Name *</Text>

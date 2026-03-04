@@ -509,13 +509,11 @@ function TabNavigator() {
         component={HistoryStackNavigator}
         options={{ tabBarLabel: 'History' }}
       />
-      {isPro && (
-        <Tab.Screen
-          name="Events"
-          component={EventsScannerScreen}
-          options={{ tabBarLabel: 'Events' }}
-        />
-      )}
+      <Tab.Screen
+        name="Events"
+        component={EventsScannerScreen}
+        options={{ tabBarLabel: 'Events' }}
+      />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

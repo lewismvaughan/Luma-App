@@ -112,11 +112,11 @@ const PLANS = {
       'Tap to Pay on iPhone & Android',
       'Simple menu builder',
       '1 custom menu',
+      'Events & ticketing',
       'Daily payout summary',
       '1 User',
     ],
     notIncluded: [
-      'Events & ticketing',
       'Online ordering & preorders',
       'Tip reports & tracking',
       'Revenue splits',
@@ -131,7 +131,6 @@ const PLANS = {
     features: [
       'Everything in Starter',
       'Unlimited custom menus',
-      'Unlimited events & locations',
       'Unlimited users & devices',
       'Staff account management',
       'Revenue splits',

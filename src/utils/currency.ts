@@ -38,10 +38,8 @@ export function formatCurrency(amount: number, currency: string = 'usd'): string
       minimumFractionDigits: zd ? 0 : 2,
       maximumFractionDigits: zd ? 0 : 2,
     }).format(amount);
-    console.log('[Currency] formatCurrency:', { amount, code, result });
     return result;
   } catch (err) {
-    console.error('[Currency] formatCurrency FAILED:', { amount, code, error: err });
     const symbol = CURRENCY_SYMBOLS[code] || code;
     return `${symbol}${zd ? amount.toFixed(0) : amount.toFixed(2)}`;
   }

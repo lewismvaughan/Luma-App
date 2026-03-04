@@ -100,14 +100,11 @@ export function EventsScannerScreen() {
   const permissionHook = useCameraPermissions ? useCameraPermissions() : [null, null];
   const [permission, requestPermission] = permissionHook || [null, null];
 
-  const isPro = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
-
-  // Fetch org events for context (Pro/Enterprise only)
+  // Fetch org events
   const { data: eventsData, isLoading: eventsLoading, error: eventsError } = useQuery({
     queryKey: ['events'],
     queryFn: () => eventsApi.list(),
     staleTime: Infinity,
-    enabled: isPro,
     placeholderData: () => queryClient.getQueryData(['events']),
   });
 
@@ -215,7 +212,7 @@ export function EventsScannerScreen() {
           <View style={styles.selectHeader}>
           <Text style={[styles.selectTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>Ticket Scanner</Text>
           <Text style={[styles.selectSubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            {isPro ? 'Select an event to start scanning' : 'Scan QR codes to check in guests'}
+            Select an event to start scanning
           </Text>
         </View>
 
@@ -235,45 +232,6 @@ export function EventsScannerScreen() {
                 </View>
               </View>
             ))}
-          </View>
-        ) : !isPro ? (
-          // Pro gate - shown after loading completes
-          <View style={styles.proGateContent}>
-            {/* Features */}
-            <View style={[styles.proFeaturesCard, { backgroundColor: glassColors.background, borderColor: glassColors.border }]}>
-              {[
-                { icon: 'qr-code-outline', text: 'Instant QR code scanning' },
-                { icon: 'checkmark-circle-outline', text: 'Real-time ticket validation' },
-                { icon: 'people-outline', text: 'Track check-in progress' },
-              ].map((feature, index) => (
-                <View key={index} style={styles.proFeatureRow}>
-                  <Ionicons name={feature.icon as any} size={18} color={colors.primary} />
-                  <Text style={[styles.proFeatureText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                    {feature.text}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            {/* Upgrade Button */}
-            <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={() => navigation.navigate('Upgrade')}
-              activeOpacity={0.8}
-              accessibilityRole="button"
-              accessibilityLabel="Upgrade to Pro"
-              accessibilityHint="Navigate to the upgrade screen"
-            >
-              <LinearGradient
-                colors={[colors.primary, '#3B82F6']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.upgradeButtonGradient}
-              >
-                <Ionicons name="diamond" size={18} color="#fff" />
-                <Text style={styles.upgradeButtonText} maxFontSizeMultiplier={1.3}>Upgrade to Pro</Text>
-              </LinearGradient>
-            </TouchableOpacity>
           </View>
         ) : eventsError ? (
           // Error state

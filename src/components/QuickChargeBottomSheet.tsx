@@ -129,7 +129,6 @@ interface QuickChargeBottomSheetProps {
 export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSheetProps) {
   const { colors, isDark } = useTheme();
   const { currency } = useAuth();
-  console.log('[QuickCharge] currency:', currency, 'symbol:', getCurrencySymbol(currency), 'formatted:', formatCents(100, currency));
   const navigation = useNavigation<any>();
   const { guardCheckout } = useTapToPayGuard();
   const insets = useSafeAreaInsets();

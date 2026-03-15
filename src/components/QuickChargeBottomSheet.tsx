@@ -174,7 +174,10 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
       return;
     }
 
-    if (!guardCheckout()) return;
+    if (!guardCheckout()) {
+      onClose();
+      return;
+    }
 
     // Close the bottom sheet
     onClose();

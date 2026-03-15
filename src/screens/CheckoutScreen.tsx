@@ -615,12 +615,6 @@ export function CheckoutScreen() {
       });
 
       // Navigate to payment processing screen
-      logger.paymentDebug('CheckoutScreen navigating to PaymentProcessing', {
-        paymentIntentId: paymentIntent.id,
-        amount: grandTotal,
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-      });
       navigation.navigate('PaymentProcessing', {
         paymentIntentId: paymentIntent.id,
         clientSecret: paymentIntent.clientSecret,

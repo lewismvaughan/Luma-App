@@ -74,10 +74,11 @@ export function PaymentProcessingScreen() {
     preferredReaderType: preferredReader?.readerType || 'none',
   });
 
-  // Swap PaymentProcessing → PaymentResult via stack reset, preserving the rest
-  // of the stack (Checkout stays so "Try Again" goBack() still works).
-  // navigation.replace between two fullScreenModal screens fails silently on
-  // iOS native-stack in production — the modal dismisses without presenting.
+  // Navigate to PaymentResult via stack reset.
+  // On SUCCESS: reset to [MainTabs, PaymentResult] — Checkout must NOT be in the
+  // stack because clearCart() empties the cart, and Checkout's useEffect calls
+  // goBack() when items.length === 0, which destroys the PaymentResult screen.
+  // On FAILURE: keep Checkout so "Try Again" (goBack) returns there.
   const navigateToResult = useCallback((params: Record<string, any>) => {
     logger.paymentDebug('navigateToResult CALLED', { success: params.success, errorMessage: params.errorMessage });
 
@@ -89,10 +90,20 @@ export function PaymentProcessingScreen() {
           routeCount: state.routes.length,
         });
 
-        const routes = [
-          ...state.routes.slice(0, -1), // everything except PaymentProcessing
-          { name: 'PaymentResult', params },
-        ];
+        let routes;
+        if (params.success) {
+          // Success: MainTabs + PaymentResult only (no Checkout)
+          routes = [
+            state.routes[0], // MainTabs
+            { name: 'PaymentResult', params },
+          ];
+        } else {
+          // Failure: keep Checkout for "Try Again"
+          routes = [
+            ...state.routes.slice(0, -1), // everything except PaymentProcessing
+            { name: 'PaymentResult', params },
+          ];
+        }
 
         logger.paymentDebug('Resetting to routes:', routes.map((r: any) => r.name));
 

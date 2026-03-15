@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../context/AuthContext';
+import { useAuth, SKIP_BIOMETRIC_KEY } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Input } from '../components/Input';
 import { colors, glass } from '../lib/colors';
@@ -79,15 +79,26 @@ export function LoginScreen() {
     checkBiometric();
   }, []);
 
-  // Auto-trigger biometric only on initial mount (app launch), not on every focus
+  // Auto-trigger biometric only on initial mount (app launch), not on every focus.
+  // Skip if the user just logged out intentionally (signOut sets SKIP_BIOMETRIC_KEY).
   const hasAttemptedBiometricRef = React.useRef(false);
   useEffect(() => {
     if (biometricEnabled && biometricCapabilities?.isAvailable && !hasAttemptedBiometricRef.current) {
       hasAttemptedBiometricRef.current = true;
-      // Small delay to let the screen render first
-      const timer = setTimeout(() => {
+
+      const maybePrompt = async () => {
+        const skip = await AsyncStorage.getItem(SKIP_BIOMETRIC_KEY).catch(() => null);
+        // Clear the flag regardless so it only applies once
+        await AsyncStorage.removeItem(SKIP_BIOMETRIC_KEY).catch(() => {});
+        if (skip) {
+          logger.log('[Login] Skipping auto biometric — user just logged out');
+          return;
+        }
         handleBiometricLogin();
-      }, 500);
+      };
+
+      // Small delay to let the screen render first
+      const timer = setTimeout(maybePrompt, 500);
       return () => clearTimeout(timer);
     }
   }, [biometricEnabled, biometricCapabilities]);

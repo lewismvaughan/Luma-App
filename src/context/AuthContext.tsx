@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Alert, Image } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService, User, Organization, Subscription, stripeConnectApi, ConnectStatus } from '../lib/api';
 import { setOnSessionKicked, apiClient } from '../lib/api/client';
 import { setOnSocketSessionKicked } from '../lib/session-callbacks';
@@ -9,6 +10,9 @@ import {
   BiometricCapabilities,
 } from '../lib/biometricAuth';
 import logger from '../lib/logger';
+
+/** When set, LoginScreen should skip the auto biometric prompt on mount. */
+export const SKIP_BIOMETRIC_KEY = 'luma_skip_biometric_on_mount';
 
 interface AuthState {
   user: User | null;
@@ -233,6 +237,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Tell LoginScreen not to auto-trigger biometric on mount —
+    // this is an intentional logout, not an app launch.
+    await AsyncStorage.setItem(SKIP_BIOMETRIC_KEY, '1').catch(() => {});
+
     // Clear state immediately for instant UI transition
     setState({
       user: null,

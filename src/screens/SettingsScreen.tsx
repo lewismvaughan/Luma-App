@@ -25,6 +25,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
+import { authService } from '../lib/api/auth';
 import { billingService, SubscriptionInfo } from '../lib/api/billing';
 import { Subscription } from '../lib/api';
 import { formatCents } from '../utils/currency';
@@ -99,10 +100,10 @@ export function SettingsScreen() {
   const status = subscriptionInfo?.status || subscription?.status;
   const isPro = tier === 'pro' || tier === 'enterprise';
 
-  // Check if user signed up via the website (Stripe platform)
-  // Website users are locked to Stripe forever and should not see in-app purchase options
-  // They must manage their subscription via the vendor portal
-  const isStripePlatformUser = subscriptionInfo?.platform === 'stripe';
+  // Check if user signed up via the website (Stripe platform) or has a manual subscription
+  // These users are locked out of IAP and should not see in-app purchase options
+  // They must manage their subscription via the vendor portal or contact support
+  const isStripePlatformUser = subscriptionInfo?.platform === 'stripe' || subscriptionInfo?.platform === 'manual';
 
 
   // Profile edit modal
@@ -159,6 +160,40 @@ export function SettingsScreen() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Your account will be deactivated immediately and permanently deleted after 30 days. All your data will be removed and this cannot be undone.\n\nYou can contact support@lumapos.co within 30 days to cancel.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Account',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await authService.requestAccountDeletion();
+              const deletionDate = result.deletionDate
+                ? new Date(result.deletionDate).toLocaleDateString()
+                : '30 days from now';
+              Alert.alert(
+                'Account Deletion Scheduled',
+                `Your account has been deactivated and is scheduled for permanent deletion on ${deletionDate}. A confirmation email has been sent to ${user?.email || 'your email'}.`,
+                [{ text: 'OK', onPress: () => signOut() }]
+              );
+            } catch (error: any) {
+              logger.error('[SettingsScreen] Account deletion request error:', error);
+              if (error?.status === 409) {
+                Alert.alert('Already Scheduled', 'Your account is already scheduled for deletion.');
+              } else {
+                Alert.alert('Error', 'Failed to process deletion request. Please try again or contact support@lumapos.com.');
+              }
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSwitchCatalog = () => {
     navigation.navigate('CatalogSelect');
   };
@@ -180,7 +215,11 @@ export function SettingsScreen() {
   const handleManageSubscription = async () => {
     if (!subscriptionInfo) return;
 
-    if (subscriptionInfo.platform === 'apple') {
+    if (subscriptionInfo.platform === 'manual') {
+      // Manual subscriptions are managed by Luma — no external link
+      Alert.alert('Managed by Luma', 'Your subscription is managed by Luma. Contact support for any changes.');
+      return;
+    } else if (subscriptionInfo.platform === 'apple') {
       // Open iOS App Store subscription management
       Linking.openURL('https://apps.apple.com/account/subscriptions');
     } else if (subscriptionInfo.platform === 'google') {
@@ -244,6 +283,8 @@ export function SettingsScreen() {
         return 'logo-apple';
       case 'google':
         return 'logo-google';
+      case 'manual':
+        return 'star-outline';
       default:
         return 'card-outline';
     }
@@ -259,6 +300,8 @@ export function SettingsScreen() {
         return 'Google Play';
       case 'stripe':
         return 'Stripe';
+      case 'manual':
+        return 'Luma';
       default:
         return '';
     }
@@ -394,7 +437,9 @@ export function SettingsScreen() {
                        tier === 'enterprise' ? 'Enterprise Plan' :
                        subscriptionInfo?.current_plan?.name || 'Starter Plan'}
                     </Text>
-                    {subscriptionInfo?.current_plan?.price ? (
+                    {subscriptionInfo?.platform === 'manual' ? (
+                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Managed by Luma</Text>
+                    ) : subscriptionInfo?.current_plan?.price ? (
                       <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
                         {formatCents(subscriptionInfo.current_plan.price, subscriptionInfo.current_plan.currency || currency)}/month
                       </Text>
@@ -435,7 +480,7 @@ export function SettingsScreen() {
             )}
 
             {/* Manage Subscription - for Pro users */}
-            {isPro && subscriptionInfo && subscriptionInfo.status !== 'none' && (
+            {isPro && subscriptionInfo && subscriptionInfo.status !== 'none' && subscriptionInfo.platform !== 'manual' && (
               <>
                 <View style={styles.divider} />
                 <TouchableOpacity style={styles.row} onPress={handleManageSubscription} disabled={manageLoading} accessibilityRole="link" accessibilityLabel={`Manage subscription via ${getSubscriptionPlatformName()}`}>
@@ -794,6 +839,14 @@ export function SettingsScreen() {
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} accessibilityRole="button" accessibilityLabel="Sign out">
             <Ionicons name="log-out-outline" size={20} color={colors.error} />
             <Text style={styles.signOutText} maxFontSizeMultiplier={1.3}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Delete Account */}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount} accessibilityRole="button" accessibilityLabel="Delete account">
+            <Ionicons name="trash-outline" size={18} color={colors.textMuted} />
+            <Text style={styles.deleteAccountText} maxFontSizeMultiplier={1.3}>Delete Account</Text>
           </TouchableOpacity>
         </View>
 
@@ -1246,6 +1299,18 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       fontSize: 16,
       fontFamily: fonts.semiBold,
       color: colors.error,
+    },
+    deleteAccountButton: {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      paddingVertical: 14,
+      gap: 8,
+    },
+    deleteAccountText: {
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.textMuted,
     },
     footer: {
       alignItems: 'center',

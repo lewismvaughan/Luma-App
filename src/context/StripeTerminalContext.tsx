@@ -881,8 +881,8 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
   }, [discoverReaders, cancelDiscovering, hookDiscoveredReaders, isInitialized, initialize]);
 
   const processPayment = useCallback(async (clientSecret: string) => {
-    logger.log('[StripeTerminal] ========== PROCESS PAYMENT START ==========');
-    logger.log('[StripeTerminal] Client secret provided:', clientSecret ? 'yes' : 'no');
+    logger.paymentDebug('========== PROCESS PAYMENT START ==========');
+    logger.paymentDebug('Client secret provided:', clientSecret ? 'yes' : 'no');
 
     try {
       setIsProcessing(true);
@@ -890,55 +890,68 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
 
       // Step 1: Retrieve the payment intent using client secret
       // NOTE: The Terminal SDK's retrievePaymentIntent requires the client_secret, NOT the PI ID
-      logger.log('[StripeTerminal] Step 1: Retrieving payment intent...');
+      logger.paymentDebug('Step 1: Retrieving payment intent...');
       const { paymentIntent, error: retrieveError } = await retrievePaymentIntent(clientSecret);
 
       if (retrieveError) {
-        logger.error('[StripeTerminal] Retrieve error:', retrieveError);
+        logger.paymentDebug('Retrieve ERROR:', JSON.stringify(retrieveError));
         throw new Error(retrieveError.message || 'Failed to retrieve payment intent');
       }
 
-      logger.log('[StripeTerminal] Payment intent retrieved successfully');
-      logger.log('[StripeTerminal] Amount:', paymentIntent?.amount);
-      logger.log('[StripeTerminal] Status:', paymentIntent?.status);
+      logger.paymentDebug('Payment intent retrieved', {
+        id: paymentIntent?.id,
+        amount: paymentIntent?.amount,
+        status: paymentIntent?.status,
+      });
 
       // Step 2: Collect payment method (shows Tap to Pay UI)
-      logger.log('[StripeTerminal] Step 2: Collecting payment method (Tap to Pay UI)...');
+      logger.paymentDebug('Step 2: Collecting payment method (Tap to Pay UI)...');
       const { paymentIntent: collectedIntent, error: collectError } = await collectPaymentMethod({
         paymentIntent,
       });
 
       if (collectError) {
-        logger.error('[StripeTerminal] Collect error:', collectError);
+        logger.paymentDebug('Collect ERROR:', JSON.stringify(collectError));
         throw new Error(collectError.message || 'Failed to collect payment method');
       }
 
-      logger.log('[StripeTerminal] Payment method collected successfully');
+      logger.paymentDebug('Payment method collected, status:', collectedIntent?.status);
 
       // Step 3: Confirm the payment
-      logger.log('[StripeTerminal] Step 3: Confirming payment...');
+      logger.paymentDebug('Step 3: Confirming payment...');
       const { paymentIntent: confirmedIntent, error: confirmError } = await confirmPaymentIntent({
         paymentIntent: collectedIntent,
       });
 
+      logger.paymentDebug('confirmPaymentIntent returned:', {
+        hasConfirmedIntent: !!confirmedIntent,
+        confirmedStatus: confirmedIntent?.status,
+        hasConfirmError: !!confirmError,
+        confirmErrorMessage: confirmError?.message,
+        confirmErrorCode: (confirmError as any)?.code,
+      });
+
       if (confirmError) {
-        logger.error('[StripeTerminal] Confirm error:', confirmError);
+        logger.paymentDebug('Confirm ERROR (throwing):', JSON.stringify(confirmError));
         throw new Error(confirmError.message || 'Failed to confirm payment');
       }
 
-      logger.log('[StripeTerminal] ========== PAYMENT SUCCESS ==========');
-      logger.log('[StripeTerminal] Final status:', confirmedIntent?.status);
+      logger.paymentDebug('========== PAYMENT SUCCESS ==========');
+      logger.paymentDebug('Final status:', confirmedIntent?.status);
+      logger.paymentDebug('Returning to PaymentProcessingScreen with status:', confirmedIntent?.status || 'unknown');
 
       return {
         status: confirmedIntent?.status || 'unknown',
         paymentIntent: confirmedIntent,
       };
     } catch (err: any) {
-      logger.error('[StripeTerminal] ========== PAYMENT FAILED ==========');
-      logger.error('[StripeTerminal] Error:', err.message);
+      logger.paymentDebug('========== PAYMENT FAILED ==========');
+      logger.paymentDebug('Error message:', err.message);
+      logger.paymentDebug('Error stack:', err.stack);
       setError(err.message || 'Payment failed');
       throw err;
     } finally {
+      logger.paymentDebug('processPayment FINALLY block — setIsProcessing(false)');
       setIsProcessing(false);
     }
   }, [retrievePaymentIntent, collectPaymentMethod, confirmPaymentIntent]);

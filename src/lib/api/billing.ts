@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type SubscriptionPlatform = 'stripe' | 'apple' | 'google';
+export type SubscriptionPlatform = 'stripe' | 'apple' | 'google' | 'manual';
 
 export interface SubscriptionPlan {
   name: string;

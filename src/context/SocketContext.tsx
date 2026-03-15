@@ -145,7 +145,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketRef.current = io(socketUrl, {
         path: '/socket.io',
         auth: { token },
-        transports: ['websocket', 'polling'],
+        transports: ['websocket'],
         reconnection: true,
         reconnectionAttempts: 10,
         reconnectionDelay: 1000,

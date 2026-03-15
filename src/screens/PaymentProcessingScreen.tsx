@@ -8,7 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 
 import { initStripe } from '@stripe/stripe-react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -65,6 +65,49 @@ export function PaymentProcessingScreen() {
   const isServerDriven = preferredReader?.readerType === 'internet';
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  logger.paymentDebug('Screen MOUNTED', {
+    paymentIntentId,
+    amount,
+    orderId,
+    orderNumber,
+    isServerDriven,
+    preferredReaderType: preferredReader?.readerType || 'none',
+  });
+
+  // Swap PaymentProcessing → PaymentResult via stack reset, preserving the rest
+  // of the stack (Checkout stays so "Try Again" goBack() still works).
+  // navigation.replace between two fullScreenModal screens fails silently on
+  // iOS native-stack in production — the modal dismisses without presenting.
+  const navigateToResult = useCallback((params: Record<string, any>) => {
+    logger.paymentDebug('navigateToResult CALLED', { success: params.success, errorMessage: params.errorMessage });
+
+    try {
+      navigation.dispatch((state: any) => {
+        logger.paymentDebug('navigation.dispatch callback — current state:', {
+          routeNames: state.routes.map((r: any) => r.name),
+          index: state.index,
+          routeCount: state.routes.length,
+        });
+
+        const routes = [
+          ...state.routes.slice(0, -1), // everything except PaymentProcessing
+          { name: 'PaymentResult', params },
+        ];
+
+        logger.paymentDebug('Resetting to routes:', routes.map((r: any) => r.name));
+
+        return CommonActions.reset({
+          index: routes.length - 1,
+          routes,
+        });
+      });
+
+      logger.paymentDebug('navigation.dispatch completed (no error thrown)');
+    } catch (navError: any) {
+      logger.paymentDebug('navigateToResult THREW ERROR:', navError.message, navError.stack);
+    }
+  }, [navigation]);
+
   // Watch for server-driven payment results from Socket.IO
   useEffect(() => {
     if (!isServerDriven || !terminalPaymentResult) return;
@@ -83,9 +126,9 @@ export function PaymentProcessingScreen() {
     }
 
     if (terminalPaymentResult.status === 'succeeded') {
-      logger.log('[PaymentProcessing] Server-driven payment succeeded');
+      logger.paymentDebug('Server-driven payment SUCCEEDED');
       clearTerminalPaymentResult();
-      navigation.replace('PaymentResult', {
+      navigateToResult({
         success: true,
         amount,
         paymentIntentId,
@@ -95,9 +138,9 @@ export function PaymentProcessingScreen() {
         preorderId,
       });
     } else {
-      logger.log('[PaymentProcessing] Server-driven payment failed:', terminalPaymentResult.error);
+      logger.paymentDebug('Server-driven payment FAILED:', terminalPaymentResult.error);
       clearTerminalPaymentResult();
-      navigation.replace('PaymentResult', {
+      navigateToResult({
         success: false,
         amount,
         paymentIntentId,
@@ -111,6 +154,7 @@ export function PaymentProcessingScreen() {
   }, [terminalPaymentResult, isServerDriven, paymentIntentId, isCancelledRef, amount, orderId, orderNumber, customerEmail, preorderId, navigation, clearTerminalPaymentResult]);
 
   useEffect(() => {
+    logger.paymentDebug('Main useEffect firing, isServerDriven:', isServerDriven);
     if (isServerDriven) {
       processServerDrivenFlow();
     } else {
@@ -118,6 +162,7 @@ export function PaymentProcessingScreen() {
     }
 
     return () => {
+      logger.paymentDebug('PaymentProcessingScreen UNMOUNTING');
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -126,6 +171,8 @@ export function PaymentProcessingScreen() {
 
   // Mode A: SDK-driven payment (Tap to Pay or Bluetooth reader)
   const processSDKFlow = async () => {
+    logger.paymentDebug('processSDKFlow START');
+
     try {
       if (Platform.OS === 'web') {
         setStatusText('Tap to Pay unavailable on web');
@@ -134,15 +181,20 @@ export function PaymentProcessingScreen() {
 
       // Wait for background warm (SDK init + reader pre-connect) to finish
       setStatusText('Preparing...');
+      logger.paymentDebug('Waiting for warm...');
       await waitForWarm();
+      logger.paymentDebug('Warm complete');
 
       // Ensure reader is connected (fast no-op if warm already connected it)
       setStatusText('Connecting...');
       try {
         // If preferred reader is Bluetooth, connect via bluetoothScan; otherwise default tapToPay
         const discoveryMethod = preferredReader?.readerType === 'bluetooth' ? 'bluetoothScan' : 'tapToPay';
+        logger.paymentDebug('Connecting reader, method:', discoveryMethod);
         await connectReader(discoveryMethod);
+        logger.paymentDebug('Reader connected');
       } catch (connectErr: any) {
+        logger.paymentDebug('Reader connection FAILED:', connectErr.message);
         if (connectErr.message?.includes('contact support')) {
           throw connectErr;
         }
@@ -150,18 +202,32 @@ export function PaymentProcessingScreen() {
       }
 
       // Initialize Stripe SDK with connected account for Terminal PI retrieval
+      logger.paymentDebug('Calling initStripe...');
       await initStripe({
         publishableKey: config.stripePublishableKey,
         merchantIdentifier: 'merchant.com.lumapos',
         stripeAccountId,
       });
+      logger.paymentDebug('initStripe complete');
 
       setStatusText('Starting payment...');
 
+      logger.paymentDebug('Calling terminalProcessPayment with clientSecret...');
       const result = await terminalProcessPayment(clientSecret);
+      logger.paymentDebug('terminalProcessPayment returned:', {
+        status: result.status,
+        hasPaymentIntent: !!result.paymentIntent,
+        paymentIntentId: result.paymentIntent?.id,
+      });
+
+      if (isCancelledRef.current) {
+        logger.paymentDebug('Payment was cancelled during processing, skipping navigation');
+        return;
+      }
 
       if (result.status === 'succeeded') {
-        navigation.replace('PaymentResult', {
+        logger.paymentDebug('Status is succeeded — calling navigateToResult(success: true)');
+        navigateToResult({
           success: true,
           amount,
           paymentIntentId,
@@ -171,10 +237,17 @@ export function PaymentProcessingScreen() {
           preorderId,
         });
       } else {
+        logger.paymentDebug('Status is NOT succeeded:', result.status, '— throwing');
         throw new Error(`Payment status: ${result.status}`);
       }
     } catch (error: any) {
-      if (isCancelledRef.current) return;
+      logger.paymentDebug('processSDKFlow CAUGHT ERROR:', error.message);
+      logger.paymentDebug('Error stack:', error.stack);
+
+      if (isCancelledRef.current) {
+        logger.paymentDebug('Cancelled — not navigating');
+        return;
+      }
 
       let errorMessage = error.message || 'Payment failed';
 
@@ -185,7 +258,8 @@ export function PaymentProcessingScreen() {
         errorMessage = 'Stripe is still setting up your account. This can take a few minutes after onboarding. Please try again shortly, or contact support if the issue persists.';
       }
 
-      navigation.replace('PaymentResult', {
+      logger.paymentDebug('Navigating to result with error:', errorMessage);
+      navigateToResult({
         success: false,
         amount,
         paymentIntentId,
@@ -206,7 +280,7 @@ export function PaymentProcessingScreen() {
       }
 
       setStatusText(`Sending to ${preferredReader.label || 'reader'}...`);
-      logger.log('[PaymentProcessing] Starting server-driven flow, reader:', preferredReader.id);
+      logger.paymentDebug('Starting server-driven flow, reader:', preferredReader.id);
 
       // Clear any stale payment result
       clearTerminalPaymentResult();
@@ -219,8 +293,8 @@ export function PaymentProcessingScreen() {
       // Set timeout — if no socket event within 2 minutes, fail
       timeoutRef.current = setTimeout(() => {
         if (!isCancelledRef.current) {
-          logger.warn('[PaymentProcessing] Server-driven payment timed out');
-          navigation.replace('PaymentResult', {
+          logger.paymentDebug('Server-driven payment TIMED OUT');
+          navigateToResult({
             success: false,
             amount,
             paymentIntentId,
@@ -244,7 +318,8 @@ export function PaymentProcessingScreen() {
         errorMessage = 'Reader not found. It may have been removed or is offline.';
       }
 
-      navigation.replace('PaymentResult', {
+      logger.paymentDebug('Server-driven flow ERROR:', errorMessage);
+      navigateToResult({
         success: false,
         amount,
         paymentIntentId,
@@ -258,6 +333,7 @@ export function PaymentProcessingScreen() {
   };
 
   const handleCancel = async () => {
+    logger.paymentDebug('handleCancel called');
     isCancelledRef.current = true;
     setIsCancelling(true);
 

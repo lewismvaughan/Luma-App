@@ -29,6 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         NFCReaderUsageDescription: 'This app uses NFC to accept contactless payments via Tap to Pay',
         NSCameraUsageDescription: 'This app uses the camera to scan payment cards and QR codes',
         NSFaceIDUsageDescription: 'This app uses Face ID to securely sign in to your account',
+        NSPhotoLibraryUsageDescription: 'This app accesses your photo library so you can upload a profile picture or add images to your products. For example, you can select a photo of a menu item to display in your catalog.',
         ITSAppUsesNonExemptEncryption: false,
       },
     },

@@ -63,6 +63,15 @@ export function PaymentResultScreen() {
   const queryClient = useQueryClient();
   const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId } = route.params;
 
+  logger.paymentDebug('PaymentResultScreen MOUNTED', {
+    success,
+    amount,
+    paymentIntentId,
+    orderId,
+    orderNumber,
+    errorMessage: errorMessage || 'none',
+  });
+
   // Dynamic font sizes based on screen width (accounting for 24px padding on each side)
   const amountText = formatCents(amount, currency);
   const availableWidth = screenWidth - 48;

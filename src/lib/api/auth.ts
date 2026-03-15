@@ -322,6 +322,10 @@ class AuthService {
     return apiClient.post<{ tapToPayDeviceIds: string[] }>('/auth/tap-to-pay-device', { deviceId });
   }
 
+  async requestAccountDeletion(): Promise<{ success: boolean; message: string; deletionDate: string }> {
+    return apiClient.post<{ success: boolean; message: string; deletionDate: string }>('/auth/request-account-deletion', {});
+  }
+
   async isAuthenticated(): Promise<boolean> {
     const token = await this.getAccessToken();
     return !!token;

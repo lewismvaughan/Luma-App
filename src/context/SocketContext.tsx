@@ -138,7 +138,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       }
 
       lastUsedTokenRef.current = token;
-      const socketUrl = config.apiUrl.replace('/api', '').replace('http://', 'ws://').replace('https://', 'wss://');
+      const socketUrl = config.wsUrl;
       logger.log('[Socket] Connecting to:', socketUrl);
       logger.log('[Socket] Using token:', token.substring(0, 20) + '...');
 

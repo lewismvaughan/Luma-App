@@ -4,6 +4,9 @@ export const config = {
   // API
   apiUrl: process.env.EXPO_PUBLIC_API_URL || 'https://api.lumapos.co',
 
+  // WebSocket
+  wsUrl: process.env.EXPO_PUBLIC_WS_URL || 'wss://api.lumapos.co',
+
   // Website
   websiteUrl: process.env.EXPO_PUBLIC_WEBSITE_URL || 'https://lumapos.co',
 

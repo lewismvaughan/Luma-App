@@ -973,4 +973,31 @@ EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
 
 ---
 
+## Code Review & Quality Enforcement
+
+All implementations will be reviewed by Codex. The following standards are enforced:
+
+### Code Standards
+- **TypeScript strict mode** — no `any` types unless explicitly justified
+- **Consistent naming** — camelCase for variables/functions, PascalCase for components/types, UPPER_SNAKE_CASE for constants
+- **No dead code** — unused imports, variables, components, or commented-out blocks must be removed
+- **Error handling** — all async operations must have proper try/catch with user-facing error messages
+- **Accessibility** — VoiceOver support required for all Tap to Pay flows, Dynamic Type support, adequate color contrast
+- **Security** — no sensitive data in logs, payment data handled exclusively by Stripe SDK, session version validated
+
+### Functionality Checks
+- **All code paths tested** — happy path, error cases, offline states, and edge cases must be verified
+- **API contracts honored** — request/response shapes must match the API's TypeScript types
+- **Payment flow integrity** — full Stripe Terminal flow must be tested end-to-end in test mode
+- **Real-time consistency** — Socket.IO event handlers must cover all events the backend emits
+- **Apple TTPOi compliance** — all Tap to Pay flows must meet Apple's requirements (Section 2-6)
+- **Platform compatibility** — must work on both iOS (XS+, iOS 16.4+) and Android (SDK 26+)
+
+### Review Process
+- Codex will flag violations of these standards during review
+- PRs with unresolved violations will not be approved
+- When in doubt, prefer explicit over clever — readability and correctness over brevity
+
+---
+
 **Remember:** This is a financial application handling real payments. Test thoroughly in Stripe test mode before any production deployment. Ensure Apple TTPOi compliance for App Store approval.

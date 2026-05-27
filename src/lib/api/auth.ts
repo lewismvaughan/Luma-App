@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import { getSecureItem, setSecureItem, deleteSecureItem } from '../secureTokens';
 import { apiClient } from './client';
 import { organizationsService } from './organizations';
 import { isBiometricLoginEnabled, clearStoredCredentials } from '../biometricAuth';
@@ -332,11 +333,13 @@ class AuthService {
   }
 
   async getAccessToken(): Promise<string | null> {
-    return AsyncStorage.getItem(AuthService.ACCESS_TOKEN_KEY);
+    // Tokens live in the OS keychain/keystore (encrypted). Legacy AsyncStorage
+    // values are migrated transparently on first read.
+    return getSecureItem(AuthService.ACCESS_TOKEN_KEY);
   }
 
   async getRefreshToken(): Promise<string | null> {
-    return AsyncStorage.getItem(AuthService.REFRESH_TOKEN_KEY);
+    return getSecureItem(AuthService.REFRESH_TOKEN_KEY);
   }
 
   async getUser(): Promise<User | null> {
@@ -410,20 +413,23 @@ class AuthService {
   }
 
   private async saveTokens(tokens: AuthTokens): Promise<void> {
+    // Tokens go to the encrypted keychain/keystore, not AsyncStorage.
     await Promise.all([
-      AsyncStorage.setItem(AuthService.ACCESS_TOKEN_KEY, tokens.accessToken),
-      AsyncStorage.setItem(AuthService.REFRESH_TOKEN_KEY, tokens.refreshToken),
+      setSecureItem(AuthService.ACCESS_TOKEN_KEY, tokens.accessToken),
+      setSecureItem(AuthService.REFRESH_TOKEN_KEY, tokens.refreshToken),
     ]);
   }
 
   private async clearAuthData(): Promise<void> {
-    await AsyncStorage.multiRemove([
-      AuthService.ACCESS_TOKEN_KEY,
-      AuthService.REFRESH_TOKEN_KEY,
-      AuthService.USER_KEY,
-      AuthService.ORGANIZATION_KEY,
-      AuthService.SESSION_VERSION_KEY,
-      AuthService.SUBSCRIPTION_KEY,
+    await Promise.all([
+      deleteSecureItem(AuthService.ACCESS_TOKEN_KEY),
+      deleteSecureItem(AuthService.REFRESH_TOKEN_KEY),
+      AsyncStorage.multiRemove([
+        AuthService.USER_KEY,
+        AuthService.ORGANIZATION_KEY,
+        AuthService.SESSION_VERSION_KEY,
+        AuthService.SUBSCRIPTION_KEY,
+      ]),
     ]);
   }
 }

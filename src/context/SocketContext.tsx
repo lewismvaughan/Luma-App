@@ -284,30 +284,24 @@ export function SocketProvider({ children }: SocketProviderProps) {
         });
       });
 
-      // Debug: Log ALL order-related events
-      const orderEvents = [
-        SocketEvents.ORDER_CREATED,
-        SocketEvents.ORDER_UPDATED,
-        SocketEvents.ORDER_COMPLETED,
-        SocketEvents.ORDER_DELETED,
-      ];
-      orderEvents.forEach((eventName) => {
-        socketRef.current?.on(eventName, (data: any) => {
-          logger.log(`[Socket DEBUG] Received ${eventName}:`, JSON.stringify(data, null, 2));
+      // Dev-only debug listeners. Previously these 7 anonymous handlers were
+      // attached on every connect() (token refresh, session changes) and never
+      // removed — they piled up on the socket and dumped full payloads
+      // (customer emails, order amounts, item notes) on every event. Gate them
+      // behind __DEV__ and log only the event name + minimal id-shape data.
+      if (__DEV__) {
+        const debugEvents = [
+          SocketEvents.ORDER_CREATED, SocketEvents.ORDER_UPDATED,
+          SocketEvents.ORDER_COMPLETED, SocketEvents.ORDER_DELETED,
+          SocketEvents.PREORDER_CREATED, SocketEvents.PREORDER_UPDATED,
+          SocketEvents.PREORDER_READY,
+        ];
+        debugEvents.forEach((eventName) => {
+          socketRef.current?.on(eventName, (data: any) => {
+            logger.log(`[Socket DEBUG] ${eventName}`, { id: data?.id, orderId: data?.orderId, preorderId: data?.preorderId, status: data?.status });
+          });
         });
-      });
-
-      // Debug: Log ALL preorder-related events
-      const preorderEvents = [
-        SocketEvents.PREORDER_CREATED,
-        SocketEvents.PREORDER_UPDATED,
-        SocketEvents.PREORDER_READY,
-      ];
-      preorderEvents.forEach((eventName) => {
-        socketRef.current?.on(eventName, (data: any) => {
-          logger.log(`[Socket DEBUG] Received ${eventName}:`, JSON.stringify(data, null, 2));
-        });
-      });
+      }
     } catch (error) {
       logger.error('[Socket] Failed to connect socket:', error);
     }
